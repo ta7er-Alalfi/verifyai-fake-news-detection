@@ -1,0 +1,21 @@
+# Core (already installed or compatible)
+fastapi
+uvicorn[standard]
+pydantic
+python-multipart
+
+# ML Dependencies (already installed or fallback)
+scikit-learn
+joblib
+numpy
+
+# Auth & Database
+PyJWT>=2.8.0
+bcrypt>=4.1.0
+aiosqlite>=0.20.0
+sqlalchemy>=2.0.30
+
+# External integrations & security
+google-auth>=2.29.0
+google-generativeai>=0.5.4
+bleach>=6.1.0
