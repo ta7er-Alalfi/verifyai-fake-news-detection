@@ -1,13 +1,14 @@
-# Core (already installed or compatible)
+# Core
 fastapi
 uvicorn[standard]
 pydantic
 python-multipart
 
-# ML Dependencies (already installed or fallback)
-scikit-learn
-joblib
-numpy
+# ML Inference (CPU-only torch for deployment)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+transformers>=4.40.0
+safetensors>=0.4.0
 
 # Auth & Database
 PyJWT>=2.8.0
