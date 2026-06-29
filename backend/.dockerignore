@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv/
+venv/
+verifyai.db
+saved_model/model.safetensors
+saved_model/training_args.bin
+saved_model/*.pkl
+.git/
+.gitignore
+Dockerfile
+.dockerignore
