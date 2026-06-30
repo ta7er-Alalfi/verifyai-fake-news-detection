@@ -17,10 +17,10 @@ def health():
 def model_info():
     info = PredictService.get_model_info()
     return {
-        "model_type": info["model_type"],
-        "base_model": info["base_model"],
-        "max_length": info["max_length"],
-        "labels": info["labels"],
-        "roberta_available": info["roberta_available"],
-        "baseline_available": info["baseline_available"]
+        "model_type": info.get("model_type"),
+        "base_model": info.get("base_model"),
+        "max_length": info.get("max_length"),
+        "labels": info.get("labels"),
+        "roberta_available": info.get("roberta_available"),
+        "baseline_available": info.get("baseline_available", False)
     }
