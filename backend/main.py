@@ -1,7 +1,10 @@
 from contextlib import asynccontextmanager
 import logging
-from fastapi import FastAPI
+import os
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from config import settings
 from database import engine, Base
@@ -15,6 +18,8 @@ from services.predict_service import PredictService
 from services.chatbot_service import ChatbotService
 
 log = logging.getLogger("fake-news-api")
+
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -63,9 +68,27 @@ app.add_middleware(
 # Custom Security Headers Middleware
 app.add_middleware(SecurityHeadersMiddleware)
 
-# Include Routers
+# Include API Routers
 app.include_router(auth_router)
 app.include_router(predict_router)
 app.include_router(chatbot_router)
 app.include_router(recommendations_router)
 app.include_router(health_router)
+
+# ── Serve React frontend (production only) ──────────────────
+# In production (Docker), the built React app lives in ./static/
+# Mount static assets (JS, CSS, images) and fall back to index.html for SPA routing
+if os.path.isdir(STATIC_DIR) and os.path.isfile(os.path.join(STATIC_DIR, "index.html")):
+    # Serve static assets (JS bundles, CSS, images, etc.)
+    app.mount("/assets", StaticFiles(directory=os.path.join(STATIC_DIR, "assets")), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(request: Request, full_path: str):
+        """Catch-all: serve index.html for any non-API route (SPA client-side routing)."""
+        # Try to serve the exact file first (e.g. favicon.ico, robots.txt)
+        file_path = os.path.join(STATIC_DIR, full_path)
+        if full_path and os.path.isfile(file_path):
+            return FileResponse(file_path)
+        # Otherwise fall back to index.html for client-side routing
+        return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+

@@ -1,0 +1,43 @@
+# Git
+.git/
+.gitignore
+
+# Python caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Node
+**/node_modules/
+**/dist/
+**/build/
+
+# Environment files
+.env
+**/.env
+
+# Large model files (downloaded from HF at runtime)
+backend/saved_model/model.safetensors
+backend/saved_model/*.bin
+backend/saved_model/*.pkl
+
+# Database
+backend/verifyai.db
+*.db
+
+# IDE / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
+*.log
+
+# Old frontend (not used)
+frontend/
+
+# Documentation / training notebooks
+models/
+frontend-only/UI_UX_DOCUMENTATION/
