@@ -98,11 +98,53 @@ class PredictService:
 
         if cls._model_type == "roberta" and cls._roberta_pipe is not None:
             try:
-                out = cls._roberta_pipe(text, batch_size=1)[0]
-                label = out["label"]
-                score = out["score"]
-                raw_prob_real = score if label == "REAL" else 1 - score
-                raw_prob_fake = 1 - raw_prob_real
+                tokenizer = cls._roberta_pipe.tokenizer
+                model = cls._roberta_pipe.model
+
+                # 1. Tokenizer input
+                inputs = tokenizer(text, return_tensors="pt", truncation=True, padding=True, max_length=384).to(model.device)
+                
+                with torch.no_grad():
+                    outputs = model(**inputs)
+                
+                # 2. Model logits
+                logits = outputs.logits
+                
+                # 3. Softmax probabilities
+                probs = torch.nn.functional.softmax(logits, dim=-1)
+                
+                # 4. Predicted class index
+                predicted_class = torch.argmax(probs, dim=-1).item()
+                
+                # 5. Final returned label
+                label = model.config.id2label[predicted_class]
+                
+                print("--- PIPELINE AUDIT ---")
+                print("1. Tokenizer input:", inputs["input_ids"])
+                print("2. Model logits:", logits)
+                print("3. Softmax probabilities:", probs)
+                print("4. Predicted class index:", predicted_class)
+                print("5. Final returned label:", label)
+                print("----------------------")
+                
+                # Ensure mapping correctly regardless of which is 0 or 1
+                fake_idx = None
+                real_idx = None
+                for k, v in model.config.id2label.items():
+                    if str(v).upper() == "FAKE":
+                        fake_idx = int(k)
+                    elif str(v).upper() == "REAL":
+                        real_idx = int(k)
+                
+                if fake_idx is not None and real_idx is not None:
+                    raw_prob_fake = probs[0][fake_idx].item()
+                    raw_prob_real = probs[0][real_idx].item()
+                else:
+                    # Fallback if labels are not standard
+                    score = probs[0][predicted_class].item()
+                    raw_prob_real = score if str(label).upper() == "REAL" else 1 - score
+                    raw_prob_fake = 1 - raw_prob_real
+
                 model_used = "roberta-base"
             except Exception as e:
                 log.error(f"RoBERTa prediction error: {e}")
