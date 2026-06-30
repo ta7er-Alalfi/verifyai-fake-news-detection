@@ -118,6 +118,9 @@ class PredictService:
                 
                 # 5. Final returned label
                 label = model.config.id2label[predicted_class]
+                log.info(f"Label={label}")
+                log.info(f"Fake={raw_prob_fake}")
+                log.info(f"Real={raw_prob_real}")  
                 
                 print("--- PIPELINE AUDIT ---")
                 print("1. Tokenizer input:", inputs["input_ids"])
