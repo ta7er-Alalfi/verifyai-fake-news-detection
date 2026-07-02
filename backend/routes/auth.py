@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Security
+from fastapi import APIRouter, Body, Depends, HTTPException, status, Security
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -8,7 +8,7 @@ from database import get_db
 from models.user import User
 from schemas.auth import (
     RegisterRequest, LoginRequest, GoogleAuthRequest, 
-    TokenResponse, UserResponse, ProfileUpdateRequest
+    TokenResponse, UserResponse, ProfileUpdateRequest, RefreshRequest
 )
 from services.auth_service import AuthService
 from middleware.auth_middleware import get_current_user, blacklist_token, security
@@ -135,7 +135,10 @@ async def google_auth(req: GoogleAuthRequest, db: AsyncSession = Depends(get_db)
         db.add(user)
         await db.flush()
     else:
-        # If user exists but registered locally, link provider if necessary or update avatar
+        # If user exists but registered locally, link provider to Google and update avatar
+        if user.provider == "local":
+            user.provider = "google"
+            user.hashed_password = None
         if picture:
             user.avatar_url = picture
         user.last_login = datetime.utcnow()
@@ -155,9 +158,14 @@ async def google_auth(req: GoogleAuthRequest, db: AsyncSession = Depends(get_db)
     )
 
 @router.post("/logout", status_code=status.HTTP_200_OK)
-async def logout(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)):
+async def logout(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    refresh_token: Optional[str] = Body(None, embed=True),
+):
     if credentials:
         blacklist_token(credentials.credentials)
+    if refresh_token:
+        blacklist_token(refresh_token)
     return {"detail": "Successfully logged out"}
 
 @router.get("/me", response_model=UserResponse)
@@ -180,8 +188,8 @@ async def update_me(
     return current_user
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh_tokens(refresh_token: str, db: AsyncSession = Depends(get_db)):
-    payload = AuthService.decode_token(refresh_token)
+async def refresh_tokens(req: RefreshRequest, db: AsyncSession = Depends(get_db)):
+    payload = AuthService.decode_token(req.refresh_token)
     if not payload or payload.get("type") != "refresh":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

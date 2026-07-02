@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
@@ -24,6 +24,8 @@ interface GoogleSignInButtonProps {
   label?: string;
   /** Where to redirect after successful auth (defaults to /dashboard) */
   redirectTo?: string;
+  /** Automatically prompt the Google login flow when the button is rendered */
+  autoPrompt?: boolean;
   className?: string;
 }
 
@@ -32,21 +34,22 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
 export default function GoogleSignInButton({
   label = "Continue with Google",
   redirectTo = "/dashboard",
+  autoPrompt = false,
   className = "",
 }: GoogleSignInButtonProps) {
   const { googleLogin } = useAuth();
   const [, setLocation] = useLocation();
   const [loading, setLoading] = useState(false);
+  const [promptAttempted, setPromptAttempted] = useState(false);
 
-  const handleGoogleSignIn = () => {
+  const startGoogleSignIn = () => {
     if (!window.google) {
       toast.error("Google Sign-In is not available. Please try again later.");
       return;
     }
 
     if (!GOOGLE_CLIENT_ID) {
-      // Demo mode: use mock token for testing without a real Google Client ID
-      handleDemoGoogleLogin();
+      toast.error("Google Sign-In is not configured for this environment.");
       return;
     }
 
@@ -65,7 +68,7 @@ export default function GoogleSignInButton({
           setLoading(false);
         }
       },
-      auto_select: false,
+      auto_select: true,
       cancel_on_tap_outside: true,
     });
 
@@ -77,21 +80,35 @@ export default function GoogleSignInButton({
     });
   };
 
-  /** Demo login using mock token (works without a real Google Client ID) */
-  const handleDemoGoogleLogin = async () => {
-    setLoading(true);
-    try {
-      const mockEmail = `demo.google.${Date.now()}@gmail.com`;
-      const mockToken = `mock_${mockEmail}_DemoGoogleUser`;
-      await googleLogin(mockToken);
-      toast.success("Signed in with Google (Demo Mode)");
-      setLocation(redirectTo);
-    } catch (err: any) {
-      toast.error(err.response?.data?.detail || "Google Sign-In failed.");
-    } finally {
-      setLoading(false);
-    }
+  const handleGoogleSignIn = () => {
+    startGoogleSignIn();
   };
+
+  useEffect(() => {
+    if (!autoPrompt || promptAttempted) {
+      return;
+    }
+
+    let timer: number | undefined;
+    const waitForGoogle = () => {
+      if (window.google && window.google.accounts?.id) {
+        startGoogleSignIn();
+        setPromptAttempted(true);
+      } else {
+        timer = window.setTimeout(waitForGoogle, 250);
+      }
+    };
+
+    if (GOOGLE_CLIENT_ID) {
+      waitForGoogle();
+    }
+
+    return () => {
+      if (timer) {
+        window.clearTimeout(timer);
+      }
+    };
+  }, [autoPrompt, promptAttempted]);
 
   return (
     <button

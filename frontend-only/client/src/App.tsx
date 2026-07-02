@@ -1,20 +1,47 @@
+import React, { useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import { AuthProvider } from "./contexts/AuthContext";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
+import AuthLoading from "./components/AuthLoading";
 import Home from "./pages/Home";
 import Result from "./pages/Result";
-import History from "./pages/History";
 import About from "./pages/About";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
+import History from "./pages/History";
 
 function Router() {
+  const [, setLocation] = useLocation();
+  const { user, loading, initialized, hadStoredAuth } = useAuth();
+
+  // If auth initialization is complete and the user is already authenticated,
+  // redirect them away from the public landing and auth pages.
+  useEffect(() => {
+    if (user) {
+      const path = window.location.pathname;
+      if (path === "/" || path === "/login" || path === "/register") {
+        setLocation("/dashboard", { replace: true });
+      }
+    }
+
+    if (!user && hadStoredAuth) {
+      const path = window.location.pathname;
+      if (path !== "/login") {
+        setLocation("/login", { replace: true });
+      }
+    }
+  }, [initialized, user, hadStoredAuth, setLocation]);
+
+  if (!initialized) {
+    return <AuthLoading />;
+  }
+
   return (
     <Switch>
       <Route path="/" component={Home} />
@@ -23,7 +50,6 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       
-      {/* Protected Routes */}
       <Route path="/dashboard">
         <ProtectedRoute>
           <Dashboard />

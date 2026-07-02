@@ -26,6 +26,95 @@ class PredictService:
     _model_type = "none"
     _load_time_ms = 0
 
+    _anonymous_patterns = [
+        "anonymous sources",
+        "anonymous source",
+        "people say",
+        "experts claim",
+        "according to insiders",
+        "someone said",
+        "allegedly",
+    ]
+
+    _urgency_patterns = [
+        "share now",
+        "before deleted",
+        "urgent",
+        "must share",
+        "act now",
+        "do not wait",
+        "forward this",
+    ]
+
+    _miracle_patterns = [
+        "cures all diseases",
+        "miracle treatment",
+        "miracle cure",
+        "cures cancer",
+        "heals everything",
+        "instant cure",
+        "medical miracle",
+    ]
+
+    _conspiracy_patterns = [
+        "government hides",
+        "secret truth",
+        "cover up",
+        "they don't want you to know",
+        "they are hiding",
+        "deep state",
+        "hidden agenda",
+    ]
+
+    _official_patterns = [
+        "according to nasa",
+        "according to the cdc",
+        "according to the who",
+        "official report",
+        "official statement",
+        "official updates",
+        "government agency",
+        "world health organization",
+        "united nations",
+        "federal agency",
+        "public health",
+        "public data",
+        "agency",
+        "nasa",
+    ]
+
+    _evidence_patterns = [
+        "according to",
+        "reported by",
+        "study says",
+        "research shows",
+        "data shows",
+        "evidence shows",
+        "verified",
+        "confirmed",
+    ]
+
+    _balanced_patterns = [
+        "however",
+        "while",
+        "although",
+        "balanced",
+        "measured",
+        "context",
+        "analysis",
+        "review",
+    ]
+
+    _clickbait_patterns = [
+        "breaking",
+        "shocking",
+        "you won't believe",
+        "must see",
+        "clickbait",
+        "mind blowing",
+        "you need to see",
+    ]
+
     @classmethod
     def load_models(cls):
         """Loads RoBERTa model: local saved_model first, then Hugging Face fallback, then demo mode."""
@@ -88,6 +177,68 @@ class PredictService:
         if req.title and req.title.strip():
             return f"{req.title.strip()} {req.text.strip()}"
         return req.text.strip()
+
+    @classmethod
+    def _detect_indicators(cls, text: str) -> tuple[list[str], list[str]]:
+        text_lower = text.lower()
+        suspicious_indicators: list[str] = []
+        positive_indicators: list[str] = []
+
+        if any(pattern in text_lower for pattern in cls._anonymous_patterns):
+            suspicious_indicators.append("Anonymous or unverified sourcing")
+
+        if any(pattern in text_lower for pattern in cls._urgency_patterns):
+            suspicious_indicators.append("Urgency and manipulation")
+
+        if any(pattern in text_lower for pattern in cls._miracle_patterns):
+            suspicious_indicators.append("Miracle cure or medical misinformation")
+
+        if any(pattern in text_lower for pattern in cls._conspiracy_patterns):
+            suspicious_indicators.append("Conspiracy framing")
+
+        if any(pattern in text_lower for pattern in cls._official_patterns):
+            positive_indicators.append("References to official organizations")
+
+        if any(pattern in text_lower for pattern in cls._evidence_patterns):
+            positive_indicators.append("Evidence-based wording")
+
+        if any(pattern in text_lower for pattern in cls._balanced_patterns):
+            positive_indicators.append("Balanced and measured language")
+
+        if not any(pattern in text_lower for pattern in cls._clickbait_patterns):
+            positive_indicators.append("No clickbait or sensational language detected")
+
+        if not suspicious_indicators:
+            positive_indicators.append("Neutral language")
+            positive_indicators.append("Objective reporting")
+
+        if not suspicious_indicators and not positive_indicators:
+            positive_indicators.append("Neutral language")
+            positive_indicators.append("Objective reporting")
+
+        return suspicious_indicators, positive_indicators
+
+    @classmethod
+    def _build_explanation(cls, prediction: str, text: str, suspicious_indicators: list[str], positive_indicators: list[str]) -> tuple[str, list[str], list[str]]:
+        if prediction == "FAKE":
+            if suspicious_indicators:
+                indicator_text = ", ".join(suspicious_indicators)
+                explanation = (
+                    f"This article was classified as FAKE because the text contains several misinformation-style cues, including {indicator_text}. "
+                    "The wording suggests unverified claims, pressure to share quickly, or sensational framing."
+                )
+            else:
+                explanation = "No major misinformation indicators were detected."
+            return explanation, suspicious_indicators, []
+
+        if positive_indicators:
+            indicator_text = ", ".join(positive_indicators)
+            explanation = (
+                f"This article was classified as REAL because the wording appears measured and evidence-based. Positive signals include {indicator_text}."
+            )
+        else:
+            explanation = "This article was classified as REAL. The tone appears measured and the content does not display major misinformation cues."
+        return explanation, [], positive_indicators
 
     @classmethod
     def _predict_one(cls, text: str) -> dict:
@@ -161,87 +312,48 @@ class PredictService:
             raw_prob_real = 1 - raw_prob_fake
             model_used = "demo_mode"
 
-        # 2. Heuristic checks
+        # 2. Heuristic checks for confidence adjustment only
         text_lower = text.lower()
         heuristic_weight = 0.0
         matched_heuristics = []
-        explanation_parts = []
 
-        # 2.1 Miracle cures / medical fake news
-        miracle_patterns = [
-            "cures cancer", "cure cancer", "cures all", "miracle cure",
-            "completely cures", "secret treatment", "cures instantly",
-            "drinking bleach", "cure within"
-        ]
-        if any(p in text_lower for p in miracle_patterns):
+        if any(p in text_lower for p in ["cures cancer", "cure cancer", "cures all", "miracle cure", "completely cures", "secret treatment", "cures instantly", "drinking bleach", "cure within"]):
             heuristic_weight += 0.40
             matched_heuristics.append("Miracle Cure/Unverified Medical Claim")
-            explanation_parts.append("an unverified medical miracle claim (e.g. curing cancer or illnesses instantly)")
 
-        # 2.2 Conspiracy / Secrecy claims
-        conspiracy_patterns = [
-            "government hides", "hiding this secret", "hiding from the public",
-            "secret society", "hiding from you", "don't want you to know",
-            "suppressed by", "big pharma", "hospitals are hiding"
-        ]
-        if any(p in text_lower for p in conspiracy_patterns):
+        if any(p in text_lower for p in ["government hides", "hiding this secret", "hiding from the public", "secret society", "hiding from you", "don't want you to know", "suppressed by", "big pharma", "hospitals are hiding"]):
             heuristic_weight += 0.35
             matched_heuristics.append("Conspiracy Framing/Secrecy Claim")
-            explanation_parts.append("conspiracy framing asserting that authorities or organizations are intentionally hiding secrets")
 
-        # 2.3 Viral pressure / Sharing urgency
-        viral_patterns = [
-            "share before deleted", "share before the government", "delete this",
-            "must share", "spread this", "go viral", "share with everyone",
-            "forward this", "copy and paste"
-        ]
-        if any(p in text_lower for p in viral_patterns):
+        if any(p in text_lower for p in ["share before deleted", "share before the government", "delete this", "must share", "spread this", "go viral", "share with everyone", "forward this", "copy and paste"]):
             heuristic_weight += 0.25
             matched_heuristics.append("Viral Sharing Pressure")
-            explanation_parts.append("urgent language designed to force social sharing before it gets 'deleted'")
 
-        # 2.4 Sensationalism / Clickbait words
-        clickbait_patterns = [
-            "breaking!!!", "breaking news", "you won't believe", "shocking",
-            "unbelievable", "mind-blowing", "wake up sheeple", "scam", "hoax"
-        ]
-        if any(p in text_lower for p in clickbait_patterns):
+        if any(p in text_lower for p in ["breaking!!!", "breaking news", "you won't believe", "shocking", "unbelievable", "mind-blowing", "wake up sheeple", "scam", "hoax"]):
             heuristic_weight += 0.20
             matched_heuristics.append("Sensationalist Clickbait Phrasing")
-            explanation_parts.append("sensationalist clickbait terms meant to trigger strong emotional responses")
 
-        # 2.5 Excessive punctuation
         if "!!!" in text:
             heuristic_weight += 0.15
             matched_heuristics.append("Excessive Exclamation Marks (!!!)")
-            explanation_parts.append("excessive exclamation marks indicating sensationalism")
         elif "!" in text and text.count("!") > 3:
             heuristic_weight += 0.10
             matched_heuristics.append("Frequent Exclamations")
-            explanation_parts.append("frequent use of exclamations to inflate importance")
 
-        # 2.6 All Caps words (excluding acronyms)
         all_caps_words = re.findall(r'\b[A-Z]{4,}\b', text)
         if len(all_caps_words) >= 3:
             heuristic_weight += 0.15
             matched_heuristics.append(f"Excessive CAPITALIZATION ({len(all_caps_words)} words)")
-            explanation_parts.append("excessive capitalization resembling shouting or sensational headlines")
 
-        # 3. Hybrid fusion
         h_score = min(heuristic_weight, 1.0)
-
-        # Calculate weighted average
         final_prob_fake = (0.6 * raw_prob_fake) + (0.4 * h_score)
 
-        # Medical/Conspiracy Penalty override
         if ("Miracle Cure/Unverified Medical Claim" in matched_heuristics or "Conspiracy Framing/Secrecy Claim" in matched_heuristics) and h_score >= 0.4:
-            # Heavily penalize and force classification as Fake
             final_prob_fake = max(final_prob_fake, 0.94)
             log.info("[HYBRID PENALTY] Medical/Conspiracy detected. Fake probability forced to >= 94%.")
 
         final_prob_real = 1.0 - final_prob_fake
 
-        # Determine final prediction
         if final_prob_fake >= 0.5:
             prediction = "FAKE"
             confidence = final_prob_fake
@@ -249,31 +361,13 @@ class PredictService:
             prediction = "REAL"
             confidence = final_prob_real
 
-        # 4. Generate dynamic explanation
-        if prediction == "FAKE":
-            if matched_heuristics:
-                reasons_str = "; ".join(matched_heuristics)
-                explanation = (
-                    f"This article has been classified as FAKE because it exhibits strong indicators of misinformation: "
-                    f"{', '.join(explanation_parts)}. Specific patterns identified: {reasons_str}."
-                )
-            else:
-                explanation = (
-                    "This article has been classified as FAKE. The neural patterns detected by our model indicate "
-                    "contextual similarities to known datasets of misinformation and propaganda."
-                )
-        else:
-            if matched_heuristics:
-                reasons_str = "; ".join(matched_heuristics)
-                explanation = (
-                    f"This article is classified as REAL, but caution is advised. While the model suggests a factual structure, "
-                    f"we detected some sensational elements: {reasons_str}."
-                )
-            else:
-                explanation = (
-                    "This article is classified as REAL. The text structure, vocabulary choice, and neutral tone "
-                    "align with standard credible journalism and factual reporting."
-                )
+        suspicious_indicators, positive_indicators = cls._detect_indicators(text)
+        explanation, indicators, positive_indicator_list = cls._build_explanation(
+            prediction,
+            text,
+            suspicious_indicators,
+            positive_indicators,
+        )
 
         # Debug log
         log.info(f"""
@@ -291,7 +385,9 @@ Decision: {prediction} with {confidence:.2%} confidence
             "prob_fake": round(final_prob_fake, 4),
             "prob_real": round(final_prob_real, 4),
             "model_used": f"{model_used}+heuristics" if matched_heuristics else model_used,
-            "explanation": explanation
+            "explanation": explanation,
+            "indicators": indicators,
+            "positive_indicators": positive_indicator_list,
         }
 
     @classmethod

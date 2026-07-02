@@ -26,10 +26,10 @@ class ChatbotService:
             try:
                 genai.configure(api_key=settings.GEMINI_API_KEY)
                 cls._gemini_initialized = True
-                log.info("✅ Gemini API initialized successfully")
+                log.info("[SUCCESS] Gemini API initialized successfully")
                 log.info("[SUCCESS] Gemini API initialized successfully")
             except Exception as e:
-                log.error(f"❌ Failed to initialize Gemini API: {e}")
+                log.error(f"[ERROR] Failed to initialize Gemini API: {e}")
                 log.error(f"[ERROR] Failed to initialize Gemini API: {e}")
 
     @classmethod
@@ -111,67 +111,81 @@ class ChatbotService:
                 log.error(f"Gemini generation error: {e}. Falling back to demo mode.")
 
         # 2. Local Fallback Demo Mode (Keyword Matching)
-        return cls._demo_response(message, context_str, context_used)
+        response_text, context_used = cls._demo_response(message, context_str, context_used)
+        log.info("Using demo fallback response for message: %s", message)
+        return response_text, context_used
 
     @classmethod
     def _demo_response(cls, message: str, context_str: str, context_used: bool) -> Tuple[str, bool]:
         msg_lower = message.lower()
         
-        # Base responses
-        if "hello" in msg_lower or "hi" in msg_lower or "أهلاً" in msg_lower or "مرحبا" in msg_lower:
+        # Specific question patterns
+        if any(word in msg_lower for word in ["bleach", "clorox", "sodium hypochlorite", "not a cure", "cure"]):
             reply = (
-                "👋 **Welcome to VerifyAI Assistant!**\n\n"
-                "I am your media literacy assistant. You can ask me how to detect fake news, how our RoBERTa model works, "
-                "or details about your prediction history! How can I help you today?"
+                "🚫 **Bleach is not a cure.**\n\n"
+                "Bleach is a dangerous chemical that can harm your skin, eyes, and lungs. It is not safe to ingest or apply to the body, and there is no scientific evidence that it cures diseases or infections. "
+                "Fake cures like this are often spread because they sound urgent or dramatic, but they are unsafe and unproven."
             )
-        elif "prediction" in msg_lower or "history" in msg_lower or "تاريخ" in msg_lower or "توقع" in msg_lower or "results" in msg_lower:
-            if context_used:
-                reply = (
-                    "📊 **Analyzing your prediction history:**\n\n"
-                    f"Based on your recent predictions: {context_str}\n\n"
-                    "It looks like you've been active! You can review details of these articles directly on your dashboard. "
-                    "Remember, a high confidence score from our RoBERTa model means the model detected structural patterns matching known "
-                    "datasets of real/fake news (such as emotional adjectives, sensational punctuation, or clickbait styling)."
-                )
-            else:
-                reply = (
-                    "📊 **Prediction History**\n\n"
-                    "You haven't run any predictions in this session yet, or you are not logged in. "
-                    "Try pasting a news article in the **Analyze** page, and I'll be able to explain the classification results!"
-                )
-        elif "model" in msg_lower or "roberta" in msg_lower or "how it works" in msg_lower or "كيف يعمل" in msg_lower or "النموذج" in msg_lower:
+        elif any(word in msg_lower for word in ["identify fake news", "real news", "spot fake news", "how can i identify fake news", "how to tell", "detect fake news"]):
             reply = (
-                "🤖 **How the AI Model Works**\n\n"
-                "Our application utilizes a dual-model approach:\n"
-                "1. **RoBERTa (Robustly Optimized BERT Approach)**: A state-of-the-art transformer model fine-tuned on a hybrid dataset of 40,000+ real and fake news articles. It reads contextual patterns and semantic structure.\n"
-                "2. **TF-IDF + Logistic Regression**: A fast statistical baseline model that analyzes word frequencies.\n\n"
-                "When you submit a text, we process it and give you a probability score. Scores near 100% indicate strong match characteristics."
+                "🔎 **How to identify fake news**\n\n"
+                "1. Check the source: trusted news organizations usually cite verifiable evidence and expert opinions.\n"
+                "2. Verify quotes and facts: see if other credible outlets report the same story.\n"
+                "3. Watch for emotional language or bold claims with no proof.\n"
+                "4. Look for supporting details: credible stories include names, dates, locations, and references.\n"
+                "5. Ask yourself if the article seems designed to provoke fear or anger rather than inform."
             )
-        elif "how to spot" in msg_lower or "tips" in msg_lower or "detect" in msg_lower or "نصائح" in msg_lower or "كشف" in msg_lower:
+        elif any(word in msg_lower for word in ["why do people spread fake news", "people spread fake news", "spread fake news", "why do people spread"]):
             reply = (
-                "🔍 **Quick Tips for Spotting Fake News**:\n\n"
-                "- **Check the Source**: Is it a reputable news agency, or a blog with typos in the URL?\n"
-                "- **Read Beyond the Headline**: Headlines are often exaggerated (clickbait) to get clicks.\n"
-                "- **Check the Date**: Old stories are sometimes reposted to make them look like current events.\n"
-                "- **Inspect Supporting Sources**: Does the article cite expert testimony or official records?\n"
-                "- **Look out for Loaded Language**: Heavy emotional appeal (e.g., 'Shocking!', 'Must share!') is a common indicator of propaganda."
+                "🧠 **Why people spread fake news**\n\n"
+                "People share fake news for different reasons: sometimes they want attention, sometimes they are emotionally triggered, and sometimes they believe the story is true. "
+                "Other times it is shared to influence opinions, increase website traffic, or manipulate public sentiment. "
+                "The more a story appeals to fear or anger, the more likely it is to spread quickly."
+            )
+        elif "hello" in msg_lower or "hi" in msg_lower or "أهلاً" in msg_lower or "مرحبا" in msg_lower:
+            reply = (
+                "👋 **Hello! I'm VerifyAI Assistant.**\n\n"
+                "Ask me about fake news detection, why some stories are unreliable, or how our system analyzes content. "
+                "For example, you can ask: 'Why is bleach not a cure?' or 'How can I identify fake news?'"
+            )
+        elif any(word in msg_lower for word in ["model", "roberta", "how it works", "كيف يعمل", "النموذج"]):
+            reply = (
+                "🤖 **How our model works**\n\n"
+                "This app uses a fine-tuned RoBERTa model to detect patterns in text that often appear in fake or misleading news. "
+                "It also combines those results with heuristic checks for language style, sources, and claims. "
+                "If the text looks sensational, overly emotional, or unsupported, it is more likely to be flagged."
+            )
+        elif any(word in msg_lower for word in ["tips", "detect", "how to spot", "نصائح", "كشف"]):
+            reply = (
+                "✅ **Tips for spotting fake news**\n\n"
+                "- Check the headline carefully: if it seems too extreme or unbelievable, verify it first.\n"
+                "- Look for credible sources or linked evidence.\n"
+                "- Compare the story with other trusted news sites.\n"
+                "- Be cautious of content that asks you to share it quickly or promises a miracle cure."
             )
         else:
-            # Context-aware general reply
-            context_added = ""
-            if context_used:
-                context_added = (
-                    "\n\n*Note: I see you've analyzed some articles recently (e.g. on your Dashboard). "
-                    "If you have questions about specific results, just let me know!*"
+            reply_templates = [
+                (
+                    "📘 **I can help explain that.**\n\n"
+                    "Fake news often uses emotional triggers and weak sources. If you want, I can walk you through a checklist for evaluating any story."
+                ),
+                (
+                    "💡 **Good question.**\n\n"
+                    "If you're unsure whether a story is real, check the source, the evidence, and whether multiple trustworthy outlets report it. "
+                    "I can also help you interpret specific claims."
+                ),
+                (
+                    "📰 **Interesting point.**\n\n"
+                    "Many misleading stories rely on vague claims, anonymous sources, or dramatic language. "
+                    "Focus on whether the article cites verifiable facts before trusting it."
                 )
-            reply = (
-                "🤖 **VerifyAI Assistant (Demo Mode)**\n\n"
-                "Thank you for your question! I am running in **Demo Mode** because a Gemini API key is not configured yet. "
-                "However, I can still guide you! You can ask me about:\n"
-                "- How our RoBERTa model predicts fake news.\n"
-                "- Practical tips to spot misinformation.\n"
-                "- Details about your recent predictions."
-                f"{context_added}"
-            )
-            
+            ]
+            idx = abs(hash(msg_lower)) % len(reply_templates)
+            reply = reply_templates[idx]
+
+            if context_used:
+                reply += (
+                    "\n\n*I also noticed your recent predictions: they can help me explain this kind of question more accurately if you want to share a specific example.*"
+                )
+
         return reply, context_used

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import type { AxiosError } from "axios";
 import api from "../lib/api";
 
 interface User {
@@ -19,6 +20,8 @@ interface AuthContextType {
   googleLogin: (idToken: string) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (username: string, avatarUrl?: string) => Promise<void>;
+  initialized: boolean;
+  hadStoredAuth: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -38,8 +41,27 @@ function clearTokens() {
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
+  const [hadStoredAuth] = useState(!!localStorage.getItem("token") || !!localStorage.getItem("refresh_token"));
 
   /** Fetch the current user from the backend using the stored token */
+  const refreshTokens = async (): Promise<boolean> => {
+    const refreshToken = localStorage.getItem("refresh_token");
+    if (!refreshToken) {
+      return false;
+    }
+
+    try {
+      const res = await api.post("/auth/refresh", { refresh_token: refreshToken });
+      saveTokens(res.data.access_token, res.data.refresh_token);
+      return true;
+    } catch {
+      clearTokens();
+      setUser(null);
+      return false;
+    }
+  };
+
   const fetchUser = async () => {
     try {
       const res = await api.get("/auth/me");
@@ -52,13 +74,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-      fetchUser();
-    } else {
-      setLoading(false);
+  const restoreSession = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const refreshToken = localStorage.getItem("refresh_token");
+
+      if (!token && refreshToken) {
+        await refreshTokens();
+      }
+
+      if (localStorage.getItem("token")) {
+        await fetchUser();
+      } else {
+        setLoading(false);
+      }
+    } finally {
+      setInitialized(true);
     }
+  };
+
+  useEffect(() => {
+    restoreSession();
+  }, []);
+
+  useEffect(() => {
+    const interceptorId = api.interceptors.response.use(
+      (response) => response,
+      async (error: AxiosError) => {
+        const originalRequest = error.config as any;
+
+        if (
+          error.response?.status === 401 &&
+          originalRequest &&
+          !originalRequest._retry
+        ) {
+          originalRequest._retry = true;
+          const refreshed = await refreshTokens();
+          if (refreshed) {
+            return api(originalRequest);
+          }
+        }
+
+        return Promise.reject(error);
+      }
+    );
+
+    return () => {
+      api.interceptors.response.eject(interceptorId);
+    };
   }, []);
 
   /** Email/Password Login */
@@ -82,10 +145,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(res.data.user);
   };
 
-  /** Logout: blacklist token server-side, then clear local state */
+  /** Logout: blacklist access and refresh tokens server-side, then clear local state */
   const logout = async () => {
     try {
-      await api.post("/auth/logout");
+      await api.post("/auth/logout", {
+        refresh_token: localStorage.getItem("refresh_token"),
+      });
     } catch {
       // Proceed with client-side logout even if server call fails
     }
@@ -100,7 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, googleLogin, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, loading, login, register, googleLogin, logout, updateUser, initialized, hadStoredAuth }}>
       {children}
     </AuthContext.Provider>
   );

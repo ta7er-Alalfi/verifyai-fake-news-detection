@@ -35,8 +35,9 @@ export default function History() {
     try {
       const res = await api.get("/predict/history");
       setArticles(res.data);
-    } catch (err) {
-      toast.error("Failed to fetch history");
+    } catch (err: any) {
+      console.error("History load failed", err);
+      toast.error(err.response?.data?.detail || "Failed to fetch history");
     } finally {
       setLoading(false);
     }

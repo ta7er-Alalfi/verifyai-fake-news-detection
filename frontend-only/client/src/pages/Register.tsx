@@ -115,7 +115,7 @@ export default function Register() {
 
         <CardContent className="px-8 pb-8 space-y-5">
           {/* ── Google Sign-Up ── */}
-          <GoogleSignInButton label="Sign up with Google" redirectTo="/dashboard" />
+          <GoogleSignInButton label="Sign up with Google" redirectTo="/dashboard" autoPrompt />
 
           {/* ── Divider ── */}
           <div className="relative flex items-center gap-3">

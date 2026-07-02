@@ -38,13 +38,9 @@ export default function Result() {
 
   const prediction = predictionData?.label || "FAKE";
   const confidence = Math.round((predictionData?.confidence || 0.87) * 100);
-  const explanation = predictionData?.explanation || "This article exhibits characteristics common to misinformation. The style and context patterns matched our fake news classification metrics.";
-
-  const suspiciousWords = [
-    { word: "sensational claim", reason: "Unverified dramatic statement" },
-    { word: "anonymous sources", reason: "Lacks credibility markers" },
-    { word: "urgent action required", reason: "Manipulative language pattern" },
-  ];
+  const explanation = predictionData?.explanation || "No major misinformation indicators were detected.";
+  const indicators = predictionData?.indicators || [];
+  const positiveIndicators = predictionData?.positive_indicators || [];
 
   const handleCopyResult = () => {
     const text = `Prediction: ${prediction}\nConfidence: ${confidence}%\nExplanation: ${explanation}`;
@@ -178,34 +174,39 @@ export default function Result() {
               </div>
             </div>
 
-            {/* Suspicious Words Section */}
+            {/* Indicator Section */}
             <Card className="border-gray-200 shadow-md">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <AlertCircle className="w-5 h-5 text-red-600" />
-                  Suspicious Elements Detected
+                  {prediction === "FAKE" ? "Misinformation Indicators" : "Positive Indicators"}
                 </CardTitle>
                 <CardDescription>
-                  Words and phrases that triggered our detection algorithm
+                  {prediction === "FAKE"
+                    ? "Signals detected from the analyzed text"
+                    : "Signals that support a trustworthy and balanced presentation"}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {suspiciousWords.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="p-4 bg-red-50 border border-red-200 rounded-lg hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-2 h-2 rounded-full bg-red-600 mt-2 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-gray-900 break-words">
-                          "{item.word}"
-                        </p>
-                        <p className="text-sm text-gray-600 mt-1">{item.reason}</p>
+                {(prediction === "FAKE" ? indicators : positiveIndicators).length > 0 ? (
+                  (prediction === "FAKE" ? indicators : positiveIndicators).map((item, idx) => (
+                    <div
+                      key={idx}
+                      className={`p-4 rounded-lg border hover:shadow-md transition-shadow ${prediction === "FAKE" ? "bg-red-50 border-red-200" : "bg-emerald-50 border-emerald-200"}`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${prediction === "FAKE" ? "bg-red-600" : "bg-emerald-600"}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-gray-900 break-words">{item}</p>
+                        </div>
                       </div>
                     </div>
+                  ))
+                ) : (
+                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg text-gray-700">
+                    No major misinformation indicators were detected.
                   </div>
-                ))}
+                )}
               </CardContent>
             </Card>
 
@@ -214,33 +215,11 @@ export default function Result() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Lightbulb className="w-5 h-5 text-blue-900" />
-                  Why This Content Is Flagged
+                  {prediction === "FAKE" ? "Why This Content Was Flagged" : "Why This Content Was Classified as Reliable"}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-gray-700 leading-relaxed mb-4">{explanation}</p>
-                
-                <div className="space-y-3 pt-4 border-t border-gray-200">
-                  <h4 className="font-semibold text-gray-900">Key Indicators:</h4>
-                  <ul className="space-y-2">
-                    <li className="flex items-start gap-3">
-                      <span className="text-red-600 font-bold mt-1">•</span>
-                      <span className="text-gray-700">Sensational language and exaggeration</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <span className="text-red-600 font-bold mt-1">•</span>
-                      <span className="text-gray-700">Lack of credible sources or citations</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <span className="text-red-600 font-bold mt-1">•</span>
-                      <span className="text-gray-700">Emotional manipulation tactics</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                      <span className="text-red-600 font-bold mt-1">•</span>
-                      <span className="text-gray-700">Unverified claims presented as facts</span>
-                    </li>
-                  </ul>
-                </div>
               </CardContent>
             </Card>
 

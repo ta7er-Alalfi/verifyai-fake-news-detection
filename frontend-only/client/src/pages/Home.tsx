@@ -41,8 +41,7 @@ export default function Home() {
   };
 
   const handlePasteUrl = () => {
-    // Placeholder for URL paste functionality
-    alert("Feature coming soon: Paste a news URL to analyze");
+    toast.info("URL analysis will be available in a future update.");
   };
 
   return (

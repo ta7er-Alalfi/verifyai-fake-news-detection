@@ -1,12 +1,18 @@
 import time
-from typing import Optional
+from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from models.user import User
 from models.prediction import PredictionHistory
-from schemas.predict import PredictRequest, PredictResult, BatchRequest, BatchResult
+from schemas.predict import (
+    PredictRequest,
+    PredictResult,
+    BatchRequest,
+    BatchResult,
+    PredictionHistoryResponse,
+)
 from services.predict_service import PredictService
 from middleware.auth_middleware import get_optional_user, get_current_user
 from middleware.rate_limiter import predict_limiter
@@ -102,7 +108,7 @@ async def predict_batch(
     total_latency = round((time.time() - t0) * 1000, 2)
     return BatchResult(results=results, total_latency_ms=total_latency)
 
-@router.get("/history")
+@router.get("/history", response_model=List[PredictionHistoryResponse])
 async def get_history(
     limit: int = 50,
     user: User = Depends(get_current_user),

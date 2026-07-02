@@ -56,6 +56,9 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     user: UserResponse
 
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
 class ProfileUpdateRequest(BaseModel):
     username: Optional[str] = Field(None, min_length=3, max_length=50)
     avatar_url: Optional[str] = Field(None)

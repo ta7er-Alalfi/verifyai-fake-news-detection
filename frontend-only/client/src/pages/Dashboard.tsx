@@ -50,15 +50,20 @@ export default function Dashboard() {
       setHistory(historyRes.data);
       setRecommendations(recsRes.data.cards || []);
     } catch (err: any) {
-      toast.error("Failed to load dashboard data");
+      console.error("Dashboard load failed", err);
+      toast.error(err.response?.data?.detail || "Failed to load dashboard data");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    if (!user) {
+      return;
+    }
+
     fetchData();
-  }, []);
+  }, [user]);
 
   const handleLogout = async () => {
     try {

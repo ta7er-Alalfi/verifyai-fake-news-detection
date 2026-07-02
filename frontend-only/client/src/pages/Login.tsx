@@ -59,7 +59,7 @@ export default function Login() {
 
         <CardContent className="px-8 pb-8 space-y-5">
           {/* ── Google Sign-In ── */}
-          <GoogleSignInButton label="Sign in with Google" redirectTo="/dashboard" />
+          <GoogleSignInButton label="Sign in with Google" redirectTo="/dashboard" autoPrompt />
 
           {/* ── Divider ── */}
           <div className="relative flex items-center gap-3">

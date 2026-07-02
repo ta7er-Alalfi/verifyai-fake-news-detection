@@ -1,6 +1,31 @@
 import os
+from pathlib import Path
 from typing import List
 from pydantic import BaseModel, Field
+
+
+def _load_dotenv() -> None:
+    backend_dir = Path(__file__).resolve().parent
+    candidates = [backend_dir / ".env", backend_dir.parent / ".env"]
+    for env_path in candidates:
+        if not env_path.is_file():
+            continue
+        try:
+            with env_path.open("r", encoding="utf-8") as f:
+                for raw_line in f:
+                    line = raw_line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    name, value = line.split("=", 1)
+                    name = name.strip()
+                    value = value.strip().strip('"').strip("'")
+                    if name and name not in os.environ:
+                        os.environ[name] = value
+            break
+        except Exception:
+            continue
+
+_load_dotenv()
 
 class Settings(BaseModel):
     # Security

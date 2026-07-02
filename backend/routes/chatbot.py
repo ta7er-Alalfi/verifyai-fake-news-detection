@@ -1,4 +1,5 @@
 from datetime import datetime
+import logging
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +15,7 @@ from middleware.auth_middleware import get_current_user
 from middleware.rate_limiter import chat_limiter
 from middleware.security import sanitize_input
 
+log = logging.getLogger("backend.chatbot")
 router = APIRouter(prefix="/chat", tags=["AI Chatbot"])
 
 @router.post("", response_model=ChatResponse, dependencies=[Depends(chat_limiter)])
@@ -24,6 +26,7 @@ async def chat_with_bot(
 ):
     # Sanitize message
     sanitized_msg = sanitize_input(req.message)
+    log.info("Chat request received for user_id=%s: %s", user.id, sanitized_msg)
     
     # 1. Fetch recent predictions for context (last 5)
     pred_result = await db.execute(
